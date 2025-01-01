@@ -42,8 +42,11 @@ MAX_BUFFER_SECONDS = 5 # If preamble found but no end sequence in 5s, reset
 AUDIO_QUEUE_MAXSIZE = 10   # Number of audio chunks to store in memory
 MESSAGE_QUEUE_MAXSIZE = 10 # Decoded messages queue
 
-# Toggle verbose diagnostic logging
+# Diagnostic logging verbosity
 DIAGNOSTIC_LOGGING = True
+
+# Print all log messages (data + diagnostic) to terminal?
+PRINT_TO_TERMINAL = True  # Default to True
 
 # Logging paths
 DATA_LOG_FILE       = "afsk_data.log"
@@ -59,23 +62,27 @@ diagnostic_logger = logging.getLogger("diagnostic_logger")
 
 formatter = logging.Formatter("[%(asctime)s] %(levelname)s: %(message)s")
 
-# Data log handler
+# Data log file handler
 data_handler = logging.FileHandler(DATA_LOG_FILE, mode='a')
 data_handler.setFormatter(formatter)
 data_logger.setLevel(logging.INFO)
 data_logger.addHandler(data_handler)
 
-# Diagnostic log handler
+# Diagnostic log file handler
 diag_handler = logging.FileHandler(DIAGNOSTIC_LOG_FILE, mode='a')
 diag_handler.setFormatter(formatter)
 diagnostic_logger.setLevel(logging.DEBUG if DIAGNOSTIC_LOGGING else logging.INFO)
 diagnostic_logger.addHandler(diag_handler)
 
-# Optionally output diagnostic to console
-if DIAGNOSTIC_LOGGING:
-    console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setFormatter(formatter)
-    diagnostic_logger.addHandler(console_handler)
+# If PRINT_TO_TERMINAL is True, we add console handlers for BOTH loggers
+if PRINT_TO_TERMINAL:
+    console_handler_data = logging.StreamHandler(sys.stdout)
+    console_handler_data.setFormatter(formatter)
+    data_logger.addHandler(console_handler_data)
+    
+    console_handler_diag = logging.StreamHandler(sys.stdout)
+    console_handler_diag.setFormatter(formatter)
+    diagnostic_logger.addHandler(console_handler_diag)
 
 
 # -------------------------
@@ -133,7 +140,7 @@ def demodulator_process(audio_q, message_q):
     detects preamble -> message -> end sequence, and pushes
     decoded messages into message_q.
     """
-    samples_per_bit = int(SAMPLE_RATE // BAUD_RATE)  # integer division for bit window
+    samples_per_bit = int(SAMPLE_RATE // BAUD_RATE)
     leftover_buffer = np.array([], dtype=np.float32)
 
     searching_preamble = True
@@ -222,7 +229,7 @@ def bits_to_string(bit_str, msb_first=True):
         if msb_first:
             val = int(byte_bits, 2)
         else:
-            val = int(byte_bits[::-1], 2)  # reverse bits for LSB first
+            val = int(byte_bits[::-1], 2)
         chars.append(chr(val))
     return "".join(chars)
 
@@ -246,7 +253,6 @@ def audio_capture_process(audio_q):
         try:
             audio_q.put_nowait(mono_data)
         except queue.Full:
-            # If queue is full, drop the chunk
             if DIAGNOSTIC_LOGGING:
                 diagnostic_logger.warning("Audio queue is full. Dropping chunk.")
 
