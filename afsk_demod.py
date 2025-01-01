@@ -26,7 +26,7 @@ import numpy as np
 # FSK parameters
 FREQ0 = 1200          # Lower frequency (Mark)
 FREQ1 = 2200          # Higher frequency (Space)
-BAUD_RATE = 1200      # Bits per second for actual transmissions
+BAUD_RATE = 300      # Bits per second for actual transmissions
 SAMPLE_RATE = 48000   # Audio sample rate in Hz (48 kHz to avoid ALSA resampling)
 
 # Protocol constants
