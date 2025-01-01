@@ -1,16 +1,17 @@
-# File: src/direwolf/build_fsk.py
+from pathlib import Path
 from cffi import FFI
 
 ffibuilder = FFI()
+CURRENT_DIR = Path(__file__).parent
 
 # Load headers
-with open('c/include/direwolf.h', 'r') as f:
+with open(CURRENT_DIR / 'c/include/direwolf.h', 'r') as f:
     direwolf_header = f.read()
-
-with open('c/include/demod_afsk.h', 'r') as f:
+    
+with open(CURRENT_DIR / 'c/include/demod_afsk.h', 'r') as f:
     demod_header = f.read()
 
-with open('c/include/hdlc_rec.h', 'r') as f:
+with open(CURRENT_DIR / 'c/include/hdlc_rec.h', 'r') as f:
     hdlc_header = f.read()
 
 # Parse header content and extract struct definition and function declarations
@@ -45,14 +46,16 @@ ffibuilder.cdef("""
                      int raw, int is_scrambled, int not_used_remove);
 """)
 
+# Create the extension module
 ffibuilder.set_source("_fsk_demod",
     """
     #include "direwolf.h"
     #include "demod_afsk.h"
     #include "hdlc_rec.h"
     """,
-    sources=['c/demod_afsk.c', 'c/hdlc_rec.c'],
-    include_dirs=['c/include']
+    sources=[str(CURRENT_DIR / 'c/demod_afsk.c'),
+            str(CURRENT_DIR / 'c/hdlc_rec.c')],
+    include_dirs=[str(CURRENT_DIR / 'c/include')]
 )
 
 if __name__ == "__main__":
