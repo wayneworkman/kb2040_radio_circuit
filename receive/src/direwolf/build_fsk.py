@@ -1,19 +1,23 @@
 # File: src/direwolf/build_fsk.py
+
 from cffi import FFI
+from pathlib import Path
 
 ffibuilder = FFI()
+CURRENT_DIR = Path(__file__).parent  # Points to "src/direwolf"
 
-# Load headers
-with open('c/include/direwolf.h', 'r') as f:
+with open(CURRENT_DIR / 'c' / 'include' / 'direwolf.h', 'r') as f:
     direwolf_header = f.read()
 
-with open('c/include/demod_afsk.h', 'r') as f:
+with open(CURRENT_DIR / 'c' / 'include' / 'demod_afsk.h', 'r') as f:
     demod_header = f.read()
 
-with open('c/include/hdlc_rec.h', 'r') as f:
+with open(CURRENT_DIR / 'c' / 'include' / 'hdlc_rec.h', 'r') as f:
     hdlc_header = f.read()
 
-# Parse header content and extract struct definition and function declarations
+# Then use cdef(...) with direwolf_header, demod_header, hdlc_header if needed.
+# or do everything inline as you have now.
+
 ffibuilder.cdef("""
     struct demodulator_state_s {
         float m_peak;
@@ -51,8 +55,11 @@ ffibuilder.set_source("_fsk_demod",
     #include "demod_afsk.h"
     #include "hdlc_rec.h"
     """,
-    sources=['c/demod_afsk.c', 'c/hdlc_rec.c'],
-    include_dirs=['c/include']
+    sources=[
+        str(CURRENT_DIR / 'c' / 'demod_afsk.c'),
+        str(CURRENT_DIR / 'c' / 'hdlc_rec.c')
+    ],
+    include_dirs=[str(CURRENT_DIR / 'c' / 'include')]
 )
 
 if __name__ == "__main__":
