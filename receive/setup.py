@@ -1,4 +1,4 @@
-from setuptools import setup, find_packages, Extension
+from setuptools import setup, find_packages
 
 setup(
     name="kb2040_radio_circuit",
@@ -20,14 +20,4 @@ setup(
         "src/direwolf/build_fsk.py:ffibuilder",
     ],
     include_package_data=True,
-    ext_modules=[
-        Extension(
-            "direwolf._fsk",
-            sources=[
-                "src/direwolf/c/demod_afsk.c",
-                "src/direwolf/c/hdlc_rec.c",
-            ],
-            include_dirs=["src/direwolf/c/include"],
-        ),
-    ],
 )
