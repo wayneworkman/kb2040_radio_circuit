@@ -1,0 +1,108 @@
+# pyproject.toml
+[build-system]
+requires = [
+    "setuptools>=45",
+    "wheel",
+    "cffi>=1.15.0",
+]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "kb2040_radio_circuit"
+version = "0.1.0"
+description = "FSK modulation and demodulation for amateur radio using KB2040"
+readme = "README.md"
+requires-python = ">=3.7"
+license = {file = "LICENSE"}
+authors = [
+    {name = "Wayne Workman", email = "your.email@example.com"},
+]
+dependencies = [
+    "numpy>=1.20.0",
+    "sounddevice>=0.4.0",
+    "cffi>=1.15.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "black>=22.0",
+    "isort>=5.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+
+[tool.black]
+line-length = 88
+target-version = ["py37"]
+include = '\.pyi?$'
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+
+# setup.py
+from setuptools import setup, find_packages
+import os
+
+# Read version from pyproject.toml
+# This is a simple version, you might want to use a proper TOML parser
+with open("pyproject.toml") as f:
+    for line in f:
+        if line.startswith("version"):
+            version = line.split("=")[1].strip().strip('"')
+            break
+
+# Read README for long description
+with open("README.md", encoding="utf-8") as f:
+    long_description = f.read()
+
+setup(
+    name="kb2040_radio_circuit",
+    version=version,
+    description="FSK modulation and demodulation for amateur radio using KB2040",
+    long_description=long_description,
+    long_description_content_type="text/markdown",
+    author="Wayne Workman",
+    author_email="your.email@example.com",
+    url="https://github.com/yourusername/kb2040_radio_circuit",
+    packages=find_packages(where="src"),
+    package_dir={"": "src"},
+    include_package_data=True,
+    python_requires=">=3.7",
+    install_requires=[
+        "numpy>=1.20.0",
+        "sounddevice>=0.4.0",
+        "cffi>=1.15.0",
+    ],
+    extras_require={
+        "dev": [
+            "pytest>=7.0",
+            "black>=22.0",
+            "isort>=5.0",
+        ],
+    },
+    setup_requires=[
+        "cffi>=1.15.0",
+        "setuptools>=45",
+        "wheel",
+    ],
+    cffi_modules=[
+        "src/direwolf/build_fsk.py:ffibuilder",
+    ],
+    classifiers=[
+        "Development Status :: 3 - Alpha",
+        "Intended Audience :: Developers",
+        "License :: OSI Approved :: MIT License",
+        "Operating System :: POSIX :: Linux",
+        "Programming Language :: Python :: 3",
+        "Programming Language :: Python :: 3.7",
+        "Programming Language :: Python :: 3.8",
+        "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.11",
+        "Topic :: Communications :: Ham Radio",
+    ],
+)
