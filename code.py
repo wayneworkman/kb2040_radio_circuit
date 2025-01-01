@@ -5,21 +5,35 @@ import board
 import pwmio
 import digitalio
 
-# FSK Configuration
+# ----------------------------
+# FSK & BAUD RATE CONFIG
+# ----------------------------
 BAUD_RATE = 300
 FREQ0 = 1200  # Mark frequency (Hz)
 FREQ1 = 2200  # Space frequency (Hz)
 interval = 300  # seconds between transmissions
 
-# Station Configuration
+# ----------------------------
+# TIMING CONSTANTS
+# ----------------------------
+# How long to wait after keying the transmitter, before sending FSK
+PTT_KEYUP_DELAY = 0.5
+
+# How long to wait after the end sequence, before releasing PTT
+PTT_KEYDOWN_DELAY = 0.5
+
+# ----------------------------
+# STATION CONFIG
+# ----------------------------
 CALLSIGN = "ke0sgq"
 PREAMBLE = "101010101010"   # 12 alternating bits
 END_SEQUENCE = "11111111"   # 8 bits to signify end of transmission
 
-# Global PWM reference so we can deinit/reinit
+# ----------------------------
+# SETUP THE PWM & PTT
+# ----------------------------
 pwm = pwmio.PWMOut(board.A0, frequency=FREQ0, duty_cycle=32767)
 
-# PTT setup
 ptt = digitalio.DigitalInOut(board.D9)
 ptt.direction = digitalio.Direction.OUTPUT
 ptt.value = False  # Start with PTT off
@@ -27,14 +41,11 @@ ptt.value = False  # Start with PTT off
 def set_tone(freq):
     """Re-initialize the PWM with the requested frequency."""
     global pwm
-    # De-initialize the existing PWM
     pwm.deinit()
-    # Create a new PWMOut at the new frequency, 50% duty
     pwm = pwmio.PWMOut(board.A0, frequency=freq, duty_cycle=32767)
 
 def send_bit(bit):
     """Send a single bit using FSK."""
-    # Use FREQ1 if bit=1, FREQ0 if bit=0
     set_tone(FREQ1 if bit else FREQ0)
     time.sleep(1.0 / BAUD_RATE)
 
@@ -55,7 +66,7 @@ def send_byte(byte):
         send_bit(bit)
 
 def send_string(message):
-    """Send a complete string."""
+    """Send a complete string (ASCII)."""
     for char in message:
         send_byte(char)
 
@@ -65,7 +76,9 @@ def transmit_packet(payload):
 
     # Key the transmitter
     ptt.value = True
-    time.sleep(0.1)  # Let PTT settle
+
+    # Wait some time before actually transmitting any FSK tones
+    time.sleep(PTT_KEYUP_DELAY)
 
     # Send the packet
     send_preamble()
@@ -73,11 +86,19 @@ def transmit_packet(payload):
     send_string(CALLSIGN)
     send_end_sequence()
 
-    # Release PTT
-    ptt.value = False
-    time.sleep(0.1)  # Let PTT release
+    # Wait some extra time after finishing the end sequence, 
+    # keeping PTT active but sending no further tones
+    time.sleep(PTT_KEYDOWN_DELAY)
 
-# Main loop
+    # Finally release PTT
+    ptt.value = False
+
+    # (Optional) small extra settle time after unkeying
+    time.sleep(0.1)
+
+# ----------------------------
+# MAIN LOOP
+# ----------------------------
 while True:
     transmit_packet("hello world")
     time.sleep(interval)  # Wait N seconds between transmissions
