@@ -3,11 +3,16 @@
 afsk_demod.py
 
 Continuously captures audio from a specified sound device and feeds it into
-the ViperwolfFSKDecoder (CFFI-based extension). Decoded bits are accumulated,
-converted into ASCII, and logged.
+the ViperwolfFSKDecoder (CFFI-based extension). Decoded bits are ONLY turned
+into a final ASCII message if:
+  - We detect a PREAMBLE_BITS pattern, and
+  - We detect an END_SEQ_BITS pattern within WAIT_FOR_END_SEC seconds
+    from the last preamble detection.
 
-Additionally, we show how you might watch for a preamble or end-sequence,
-though real AX.25 or other protocols require more robust parsing.
+If we detect a second preamble while in that wait window, we discard the old
+partial bits and re-start the timer with the new preamble.
+
+If no end-sequence is found by the timeout, the partial bits are discarded.
 
 Press ENTER at any time to stop the script.
 
@@ -33,33 +38,32 @@ from viperwolf.python.viperwolf_wrapper import ViperwolfFSKDecoder
 # -----------------------------
 # GLOBAL CONSTANTS
 # -----------------------------
-AUDIO_DEVICE_ID = 4            # <-- Change to your audio input device ID
-AUDIO_GAIN      = 1.0          # <-- Adjust for audio amplitude scaling
-DATA_LOG_FILE   = "afsk_decoded_messages.log"
-DIAG_LOG_FILE   = "afsk_diagnostic.log"
+AUDIO_DEVICE_ID     = 4            # <-- Change to your audio input device ID
+AUDIO_GAIN          = 1.0          # <-- Adjust for audio amplitude scaling
+DATA_LOG_FILE       = "afsk_decoded_messages.log"
+DIAG_LOG_FILE       = "afsk_diagnostic.log"
 
-CHUNK_SIZE      = 1024
-SAMPLE_RATE     = 48000
+CHUNK_SIZE          = 1024
+SAMPLE_RATE         = 48000
 
-# For demonstration, let's say we have a known preamble "10101010"
-# and an end sequence "11111111" (very naive examples).
-PREAMBLE_BITS   = "10101010"
-END_SEQ_BITS    = "11111111"
+PREAMBLE_BITS       = "101010101010"   # 12 bits: matches "PREAMBLE" in code.py
+END_SEQ_BITS        = "11111111"       # 8 bits: matches "END_SEQUENCE" in code.py
+WAIT_FOR_END_SEC    = 5.0             # how many seconds to wait after a preamble
 
-SHOULD_EXIT     = False
+SHOULD_EXIT         = False
 
-# We'll accumulate raw bits in a buffer, convert to ASCII when we have 8 bits
-accum_bits      = []
-# We'll accumulate ASCII chars into a 'current message' until we detect an end sequence
-current_message = []
+# We only accumulate bits when "in_message" is True
+# once we see a valid preamble, we set in_message = True, store bits,
+# watch the clock, if we see end in time => we decode. If we see 2nd preamble => restart.
+in_message          = False
+preamble_detected_time = 0.0   # tracks when we last detected a preamble
+accum_bits          = []       # bits from the last preamble until end or timeout
 
 # -----------------------------
 # LOGGING HELPER FUNCTIONS
 # -----------------------------
 def get_timestamp():
-    """
-    Return a string with the current local time. e.g. 2025-01-02 12:34:56
-    """
+    """Return a string with the current local time. e.g. 2025-01-02 12:34:56."""
     return datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 def log_data_message(msg):
@@ -101,115 +105,99 @@ decoder = ViperwolfFSKDecoder(
 )
 
 # -----------------------------
-# BIT-PROCESSING / ASCII UTILS
+# BIT UTILS
 # -----------------------------
-def handle_raw_bits(bit_list):
-    """
-    Accepts a list of new bits (integers 0 or 1) from the ring buffer,
-    merges them into a global 'accum_bits', and converts them to ASCII in groups of 8.
-    Also does naive check for preamble and end-sequence.
-    """
-    global accum_bits
-    global current_message
-
-    # 1) Append the new bits to our global bit list
-    accum_bits.extend(bit_list)
-
-    # 2) Check each bit for (optional) naive preamble/end detection
-    #    We'll do a "sliding window" approach on accum_bits, just to show the idea.
-    #    This is very naive, doesn't handle transitions well. Real protocols are more complex.
-    bit_string = "".join(str(b) for b in accum_bits)
-
-    # If we find the preamble:
-    idx_preamble = bit_string.find(PREAMBLE_BITS)
-    if idx_preamble != -1:
-        # We see a preamble. Possibly we "start a new message".
-        log_diagnostic("Preamble detected! Starting a new message.")
-        # Reset the current message buffer
-        current_message = []
-        # We'll just ignore bits up to that point, so let's re-slice accum_bits.
-        keep_index = idx_preamble + len(PREAMBLE_BITS)
-        accum_bits = list(map(int, list(bit_string[keep_index:])))
-        return  # exit early, let new bits come in next iteration
-
-    # If we find the end sequence:
-    idx_end = bit_string.find(END_SEQ_BITS)
-    if idx_end != -1:
-        # We'll parse all bits up to that point into ASCII,
-        # then treat that as a "complete message".
-        # Then we remove them from accum_bits. The rest might be next message.
-        message_part_bits = bit_string[:idx_end]  # bits up to end seq
-        # convert that part to ASCII
-        ascii_text = bits_to_ascii(message_part_bits)
-        current_message.append(ascii_text)
-        final_msg = "".join(current_message)
-
-        # Log as a "complete" message
-        log_data_message(f"Complete message: {repr(final_msg)}")
-
-        # Now remove all bits including that end sequence
-        keep_index = idx_end + len(END_SEQ_BITS)
-        leftover = bit_string[keep_index:]
-        accum_bits = list(map(int, list(leftover)))
-
-        # Reset for next message:
-        current_message = []
-        return
-
-    # 3) Otherwise, if no special sequences found, let's parse all we can.
-    #    But let's not parse everything into ASCII yet if we might be waiting for a preamble, etc.
-    #    For demonstration, we convert *all bits* in multiples of 8 to ASCII
-    #    and append them to 'current_message'.
-    partial_ascii, leftover_bits = convert_bits_in_chunks_of_8(accum_bits)
-    if partial_ascii:
-        # Accumulate these ASCII characters into current_message (not a "complete" message yet)
-        current_message.append(partial_ascii)
-
-    # leftover_bits are bits that don't make a full byte yet
-    accum_bits = leftover_bits
-
-
-def convert_bits_in_chunks_of_8(bit_list):
-    """
-    Given a list of bits (0/1), convert as many full bytes (8 bits) to ASCII as possible.
-    Return (ascii_string, leftover_bits).
-    ascii_string is the textual result. leftover_bits is a list of leftover bits < 8 in length.
-    """
-    result_chars = []
-    length = len(bit_list)
-    idx = 0
-    while (idx + 7) < length:
-        # collect 8 bits
-        chunk = bit_list[idx : idx+8]
-        idx += 8
-        val = 0
-        for bit in chunk:
-            val = (val << 1) | bit
-        # now 'val' is an integer from 0..255
-        # convert to ASCII character
-        c = chr(val)
-        result_chars.append(c)
-
-    leftover = bit_list[idx:]  # bits that didn't fit into a full byte
-    return ("".join(result_chars), leftover)
-
-
 def bits_to_ascii(bit_string):
     """
     Convert a raw bit string (e.g. '10101000') into ASCII in groups of 8 bits.
     Return the resulting string. 
     """
     chars = []
-    # chunk the bit_string every 8 bits
     for i in range(0, len(bit_string), 8):
         chunk = bit_string[i : i+8]
         if len(chunk) < 8:
-            break
+            break  # ignore leftover
         val = 0
         for bit in chunk:
             val = (val << 1) | (1 if bit == '1' else 0)
         chars.append(chr(val))
     return "".join(chars)
+
+# -----------------------------
+# BIT-PROCESSING 
+# -----------------------------
+def handle_raw_bits(bit_list):
+    """
+    Accepts newly arrived bits from the ring buffer. 
+    We'll only do something if we're in a "message" state or we see a preamble.
+    """
+    global in_message
+    global accum_bits
+    global preamble_detected_time
+
+    # 1) If we're currently ignoring bits (no preamble yet),
+    #    see if the new chunk has a preamble.
+    # 2) If we are collecting bits, see if we find a new preamble or an end sequence.
+
+    # Convert the new bits to a string for searching
+    new_str = "".join(str(b) for b in bit_list)
+
+    # We might also want to merge them into a big string for searching across boundaries
+    if in_message:
+        # We are currently accumulating
+        accum_bits.extend(bit_list)
+        # Then form a single string from accum_bits
+        merged_str = "".join(str(b) for b in accum_bits)
+
+        # see if there's an end sequence
+        idx_end = merged_str.find(END_SEQ_BITS)
+        if idx_end != -1:
+            # yes, we found an end
+            # everything before idx_end is the message (excluding the end sequence)
+            message_part = merged_str[:idx_end]
+            ascii_text = bits_to_ascii(message_part)
+            log_data_message(f"Complete message: {repr(ascii_text)}")
+
+            # done with this message
+            in_message = False
+            accum_bits = []
+            return
+
+        # else see if there's a second preamble that resets the timer
+        idx_preamble_2 = merged_str.find(PREAMBLE_BITS)
+        if idx_preamble_2 != -1:
+            # We found a second preamble while still in the old message
+            log_diagnostic("2nd preamble detected - restarting the partial message/timer.")
+            in_message = True
+            preamble_detected_time = time.time()
+            # discard bits up to & including that 2nd preamble
+            keep_index = idx_preamble_2 + len(PREAMBLE_BITS)
+            leftover_str = merged_str[keep_index:]
+            accum_bits = list(map(int, leftover_str))
+            return
+
+        # else check for timeout
+        elapsed = time.time() - preamble_detected_time
+        if elapsed > WAIT_FOR_END_SEC:
+            log_diagnostic("No end-sequence found in time; discarding partial bits.")
+            in_message = False
+            accum_bits = []
+            return
+
+    else:
+        # we are ignoring bits => check if the new bits contain a preamble
+        idx_preamble = new_str.find(PREAMBLE_BITS)
+        if idx_preamble != -1:
+            # found a preamble
+            log_diagnostic("Preamble detected! Starting a new message.")
+            in_message = True
+            preamble_detected_time = time.time()
+
+            # discard everything up to & including that preamble from the new chunk
+            keep_index = idx_preamble + len(PREAMBLE_BITS)
+            leftover_str = new_str[keep_index:]
+            accum_bits = list(map(int, leftover_str))
+        # else do nothing, keep ignoring bits
 
 
 # -----------------------------
@@ -246,7 +234,6 @@ def audio_capture_loop():
                 # Then retrieve any raw bits
                 raw_bits = decoder.get_raw_bits(4096)
                 if raw_bits:
-                    # Instead of printing them raw, let's handle them
                     handle_raw_bits(raw_bits)
 
                 time.sleep(0.01)
