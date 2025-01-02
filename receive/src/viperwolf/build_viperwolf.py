@@ -43,6 +43,7 @@ ffibuilder.set_source(
         str(CURRENT_DIR / "c" / "my_fsk.c"),
         str(CURRENT_DIR / "c" / "dsp.c"),
         str(CURRENT_DIR / "c" / "textcolor.c"),
+        str(CURRENT_DIR / "c" / "demod_factory.c"),
     ],
     include_dirs=[str(CURRENT_DIR / "c" / "include")]
 )

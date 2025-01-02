@@ -9,10 +9,12 @@ class ViperwolfFSKDecoder:
         self.ffi = FFI()
         self._init_ffi()
 
-        # Allocate our demodulator state
-        self.demod_state = self.ffi.new("struct demodulator_state_s *")
+        # ---- Create a new demodulator_state_s using the factory in C.
+        self.demod_state = self.lib.create_demodulator_state()
+        if not self.demod_state:
+            raise MemoryError("create_demodulator_state() returned NULL (allocation failed)")
 
-        # Initialize the demod
+        # Now call demod_afsk_init on that allocated pointer:
         self.lib.demod_afsk_init(
             sample_rate,
             baud_rate,
@@ -25,6 +27,9 @@ class ViperwolfFSKDecoder:
     def _init_ffi(self):
         self.ffi.cdef("""
             typedef struct demodulator_state_s demodulator_state_s;
+
+            demodulator_state_s * create_demodulator_state(void);
+            void free_demodulator_state(demodulator_state_s *p);
 
             void demod_afsk_init(int, int, int, int, char, demodulator_state_s*);
             void demod_afsk_process_sample(int, int, int, demodulator_state_s*);
@@ -39,9 +44,17 @@ class ViperwolfFSKDecoder:
         so_path = os.path.join(current_dir, "_viperwolf_demod.so")
         self.lib = self.ffi.dlopen(so_path)
 
+    def __del__(self):
+        """
+        Optional destructor to free the allocated struct and avoid memory leaks.
+        """
+        if getattr(self, 'demod_state', None):
+            self.lib.free_demodulator_state(self.demod_state)
+            self.demod_state = None
+
     def process_samples(self, samples):
         """
-        Feed a list/array of float samples [-1..+1].
+        Feed a list or array of float samples [-1..+1].
         """
         for sample in samples:
             scaled = int(sample * 32767)
