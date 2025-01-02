@@ -1,9 +1,9 @@
-# File: receive/src/direwolf/python/fsk_wrapper.py
+# File: receive/src/viperwolf/python/viperwolf_wrapper.py
 
 from cffi import FFI
 import numpy as np
 
-class DirewolfFSKDecoder:
+class ViperwolfFSKDecoder:
     def __init__(self, sample_rate=48000, baud_rate=300,
                  mark_freq=1200, space_freq=2200):
         self.ffi = FFI()
@@ -18,7 +18,7 @@ class DirewolfFSKDecoder:
             baud_rate,
             mark_freq,
             space_freq,
-            ord('A'),    # or 'B' if you prefer
+            ord('A'),  # or 'B' if you prefer
             self.demod_state
         )
 
@@ -33,13 +33,13 @@ class DirewolfFSKDecoder:
             int my_fsk_get_bits(int *out_bits, int max_bits);
             void my_fsk_clear_buffer(void);
         """)
-        # Load the just-compiled shared object:
-        self.lib = self.ffi.dlopen("_fsk_demod.so")
+        # Load the compiled extension: _viperwolf_demod.so
+        self.lib = self.ffi.dlopen("_viperwolf_demod.so")
 
     def process_samples(self, samples):
         """
         Feed a numpy array of float32 samples, e.g. from a mic input,
-        scaled to [-1..+1], into the demod. We'll do single-slicer logic.
+        scaled to [-1..+1].
         """
         for sample in samples:
             scaled = int(sample * 32767)

@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=45", "wheel", "cffi>=1.15.0"]
+requires = ["setuptools>=62", "wheel", "cffi>=1.15.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -8,11 +8,11 @@ version = "0.1.0"
 description = "FSK modulation and demodulation for amateur radio using KB2040"
 requires-python = ">=3.7"
 authors = [
-    {name = "Wayne Workman", email = "wayne@example.com"}
+    { name = "Wayne Workman", email = "wayne@example.com" }
 ]
 dependencies = [
     "numpy>=1.20.0",
-    "sounddevice>=0.4.0", 
+    "sounddevice>=0.4.0",
     "cffi>=1.15.0"
 ]
 
@@ -22,6 +22,9 @@ dev = [
     "black>=22.0",
     "isort>=5.0"
 ]
+
+[tool.cffi_modules]
+"viperwolf/build_viperwolf.py:ffibuilder" = []
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

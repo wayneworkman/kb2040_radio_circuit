@@ -3,7 +3,7 @@
 #ifndef AUDIO_H
 #define AUDIO_H
 
-#include "direwolf.h"
+#include "viperwolf.h"
 
 // Minimal stub:
 struct audio_s {

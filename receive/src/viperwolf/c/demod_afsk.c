@@ -8,7 +8,7 @@
 #include "fsk_gen_filter.h"
 #include "my_fsk.h"     // ring buffer for raw bits
 #include "textcolor.h"
-#include "direwolf.h"
+#include "viperwolf.h"
 #include "dsp.h"
 
 #define MIN(a,b) ((a)<(b)?(a):(b))

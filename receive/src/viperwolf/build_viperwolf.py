@@ -1,18 +1,10 @@
-# File: receive/src/direwolf/build_fsk.py
+# File: receive/src/viperwolf/build_viperwolf.py
 
 from cffi import FFI
 from pathlib import Path
 
 ffibuilder = FFI()
-CURRENT_DIR = Path(__file__).parent  # e.g. "src/direwolf"
-
-# We do not need to read any .h file contents. This is optional:
-with open(CURRENT_DIR / 'c' / 'include' / 'direwolf.h', 'r') as f:
-    direwolf_header = f.read()
-with open(CURRENT_DIR / 'c' / 'include' / 'demod_afsk.h', 'r') as f:
-    demod_header = f.read()
-with open(CURRENT_DIR / 'c' / 'include' / 'my_fsk.h', 'r') as f:
-    myfsk_header = f.read()
+CURRENT_DIR = Path(__file__).parent  # e.g. "src/viperwolf"
 
 # Minimal cdef for single-slicer + raw bit ring buffer:
 ffibuilder.cdef("""
@@ -34,10 +26,9 @@ ffibuilder.cdef("""
 """)
 
 ffibuilder.set_source(
-    "_fsk_demod",
-    # This string is pasted verbatim into _fsk_demod.c:
+    "_viperwolf_demod",  # Will produce _viperwolf_demod.so (or similar)
     """
-    #include "direwolf.h"
+    #include "viperwolf.h"
     #include "demod_afsk.h"
     #include "my_fsk.h"  // For the ring buffer
     """,

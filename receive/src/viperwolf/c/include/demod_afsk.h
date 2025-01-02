@@ -9,7 +9,7 @@
 #include <string.h>
 #include <ctype.h>
 
-#include "direwolf.h"
+#include "viperwolf.h"
 #include "fsk_demod_state.h"
 #include "dsp.h"
 #include "textcolor.h"
