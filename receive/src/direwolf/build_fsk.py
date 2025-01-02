@@ -50,7 +50,7 @@ ffibuilder.set_source(
     """,
     sources=[
         str(CURRENT_DIR / 'c' / 'demod_afsk.c'),
-        # str(CURRENT_DIR / 'c' / 'hdlc_rec.c'),     # KEEP THIS if it's the correct (only) version
+        str(CURRENT_DIR / 'c' / 'hdlc_rec.c'),  # <--- add this line
     ],
     include_dirs=[str(CURRENT_DIR / 'c' / 'include')]
 )

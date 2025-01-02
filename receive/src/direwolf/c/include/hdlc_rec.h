@@ -1,96 +1,71 @@
-//
-// hdlc_rec.c (minimal AFSK-only version)
-//
-#include "direwolf.h"
+#ifndef HDLC_REC_H
+#define HDLC_REC_H
 
-#include <stdio.h>
-#include <assert.h>
-#include <string.h>
-#include <stdint.h>  // for uint64_t
+#include <stdint.h>
+#include "direwolf.h"   // for MAX_CHANS, MAX_SUBCHANS, MAX_SLICERS
+#include "fcs_calc.h"   // if you need FCS/CRC functions (optional)
 
-// We keep fcs_calc if you want a normal AX.25 HDLC approach. 
-// If you do NOT want to do CRC checks, remove references to it as well.
-#include "fcs_calc.h"
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /*
- * We remove everything referencing EAS, AIS, scramble, 9600, multi_modem, etc.
- * This file just accumulates bits into HDLC frames.
+ * Minimal AFSK-only approach:
+ * We define a single "hdlc_state_s" struct to hold per-subchannel decode state.
  */
 
-#define MIN_FRAME_LEN 4   // or AX25_MIN_PACKET_LEN + 2, if you want
-#define MAX_FRAME_LEN 330 // or AX25_MAX_PACKET_LEN + 2
+#define MIN_FRAME_LEN 4   // e.g. minimal HDLC frame (or AX.25 + 2 bytes FCS)
+#define MAX_FRAME_LEN 330 // e.g. maximum AX.25 (+ FCS). Adjust if needed.
 
+/**
+ * @struct hdlc_state_s
+ * @brief  Holds HDLC decoder state for a single subchannel/slice.
+ *
+ * If you only do AFSK, you typically have 1 subchannel (0) and 1 slicer (0).
+ * This minimal approach uses NRZI decoding but does not do fancy bit-stuff checks.
+ */
 struct hdlc_state_s {
-    int prev_raw;        // used for NRZI decoding
-    unsigned char pat_det;   // pattern detector
-    unsigned char oacc;      // octet accumulator
-    int olen;                // bits in oacc
+    int prev_raw;              // for NRZI decoding: "previous raw bit"
+    unsigned char pat_det;     // pattern detector shift register
+    unsigned char oacc;        // octet accumulator (8 bits => 1 byte)
+    int olen;                  // how many bits we have in 'oacc'
     unsigned char frame_buf[MAX_FRAME_LEN];
     int frame_len;
 };
 
-static struct hdlc_state_s hdlc_state[MAX_CHANS][MAX_SUBCHANS][MAX_SLICERS];
-
-// If you want to do a "data detect" approach for DCD, 
-// you can keep a per-slice or per-subchannel approach. 
-// We'll skip that for minimal code.
-
-void hdlc_rec_init(void)
-{
-    memset(hdlc_state, 0, sizeof(hdlc_state));
-    // If you have anything else to init, do it here.
-}
-
-// Minimal function to feed bits:
-void hdlc_rec_bit(int chan, int subchan, int slice,
-                  int raw, int is_scrambled, int not_used_remove)
-{
-    // Use NRZI decoding: '0' => invert prev bit, '1' => same as prev.
-    // For minimal approach, let's just do raw (no scramble logic).
-    // If you want real NRZI: 
-    struct hdlc_state_s *H = &hdlc_state[chan][subchan][slice];
-
-    int dbit = (raw == H->prev_raw) ? 1 : 0;
-    H->prev_raw = raw;
-
-    // pattern detect, see if it's 0x7E (01111110)
-    H->pat_det >>= 1;
-    if(dbit)
-        H->pat_det |= 0x80;
-
-    // For a minimal approach, let's parse frames if 0x7E is found:
-    if(H->pat_det == 0x7e) {
-        // check if we have enough for a frame
-        // ...
-        // For minimal code, let's just reset:
-        H->olen = 0;
-        H->frame_len = 0;
-        return;
-    }
-
-    // bit stuffing check? If needed, etc.
-    // For minimal code, skip it or implement it.
-
-    // accumulate bits
-    if(H->olen < 0) {
-        // means we are ignoring bits if not in a frame
-        return;
-    }
-
-    H->oacc >>= 1;
-    if(dbit) H->oacc |= 0x80;
-    H->olen++;
-
-    if(H->olen == 8) {
-        if(H->frame_len < MAX_FRAME_LEN) {
-            H->frame_buf[H->frame_len++] = H->oacc;
-        }
-        H->olen = 0;
-    }
-}
-
-/* 
- * If you want to finalize the frame (e.g. after seeing a flag),
- * you could compute FCS here or pass up the data to some callback.
+/**
+ * @brief Initialize all HDLC states (clears buffers, etc.).
+ *
+ * Typically called once during startup.
  */
+void hdlc_rec_init(void);
 
+/**
+ * @brief Process one raw bit into the HDLC decoder.
+ *
+ * @param chan         Audio channel index (0..MAX_CHANS-1).
+ * @param subchan      Subchannel index (0..MAX_SUBCHANS-1).
+ * @param slice        Slicer index if you have multiple slicing thresholds (0..MAX_SLICERS-1).
+ * @param raw          The “raw” bit after your demodulator (>0 => ‘1’ else ‘0’).
+ * @param is_scrambled For 9600 scramble logic or similar (unused in minimal code).
+ * @param not_used_remove A placeholder for future expansion (unused).
+ */
+void hdlc_rec_bit(int chan, int subchan, int slice,
+                  int raw, int is_scrambled, int not_used_remove);
+
+/**
+ * @brief Retrieve the most recently captured frame, if any.
+ *
+ * If a valid HDLC frame was detected, it copies the data to @p out
+ * and returns the length in bytes. If no new frame is available, returns -1.
+ *
+ * @param[out] out Pointer to user buffer to store the frame bytes.
+ * @return Length of the frame in bytes, or -1 if none available.
+ */
+int hdlc_get_frame(unsigned char *out);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* HDLC_REC_H */
