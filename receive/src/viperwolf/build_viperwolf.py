@@ -7,10 +7,10 @@ import shutil
 from pathlib import Path
 from cffi import FFI
 
-print("** BUILDING VIPERWOLF EXTENSION (v2-fixed-search-and-rename) **", file=sys.stderr)
+print("** BUILDING VIPERWOLF EXTENSION (with dsp.c) **", file=sys.stderr)
 
 ffibuilder = FFI()
-CURRENT_DIR = Path(__file__).parent  # e.g. /.../receive/src/viperwolf
+CURRENT_DIR = Path(__file__).parent
 
 # Our minimal cdef
 ffibuilder.cdef(r"""
@@ -31,17 +31,19 @@ ffibuilder.cdef(r"""
 """)
 
 ffibuilder.set_source(
-    "_viperwolf_demod",  # The base name cffi uses
+    "_viperwolf_demod",
     r'''
     #include "viperwolf.h"
     #include "demod_afsk.h"
     #include "my_fsk.h"
     ''',
     sources=[
+        # Build the c files needed:
         str(CURRENT_DIR / "c" / "demod_afsk.c"),
         str(CURRENT_DIR / "c" / "my_fsk.c"),
+        str(CURRENT_DIR / "c" / "dsp.c"),        # Add dsp.c
     ],
-    include_dirs=[str(CURRENT_DIR / "c" / "include")],
+    include_dirs=[str(CURRENT_DIR / "c" / "include")]
 )
 
 if __name__ == "__main__":
