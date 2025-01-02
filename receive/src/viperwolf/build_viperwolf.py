@@ -41,7 +41,8 @@ ffibuilder.set_source(
         # Build the c files needed:
         str(CURRENT_DIR / "c" / "demod_afsk.c"),
         str(CURRENT_DIR / "c" / "my_fsk.c"),
-        str(CURRENT_DIR / "c" / "dsp.c"),        # Add dsp.c
+        str(CURRENT_DIR / "c" / "dsp.c"),
+        str(CURRENT_DIR / "c" / "textcolor.c"),
     ],
     include_dirs=[str(CURRENT_DIR / "c" / "include")]
 )
