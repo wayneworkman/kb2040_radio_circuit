@@ -24,22 +24,16 @@ class DirewolfFSKDecoder:
     def _init_ffi(self):
         """Initialize the FFI interface to C code."""
         self.ffi.cdef("""
-            struct demodulator_state_s {
-                float m_peak;
-                float m_valley;
-                float s_peak;
-                float s_valley;
-                // Add other needed fields
-            };
-            
-            void demod_afsk_init(int samples_per_sec, int baud, 
-                               int mark_freq, int space_freq,
-                               char profile, 
-                               struct demodulator_state_s *D);
-                               
+            typedef struct demodulator_state_s demodulator_state_s;
+
+            void demod_afsk_init(int samples_per_sec, int baud,
+                                int mark_freq, int space_freq,
+                                char profile,
+                                demodulator_state_s *D);
+
             void demod_afsk_process_sample(int chan, int subchan,
-                                         int sam,
-                                         struct demodulator_state_s *D);
+                                        int sam,
+                                        demodulator_state_s *D);
         """)
         
         self.lib = self.ffi.dlopen("_fsk_demod.so")

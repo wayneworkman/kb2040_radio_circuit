@@ -19,35 +19,23 @@ with open(CURRENT_DIR / 'c' / 'include' / 'hdlc_rec.h', 'r') as f:
 # or do everything inline as you have now.
 
 ffibuilder.cdef("""
-    struct demodulator_state_s {
-        float m_peak;
-        float m_valley;
-        float s_peak;
-        float s_valley;
-        char profile;
-        int num_slicers;
-        int use_prefilter;
-        float prefilter_baud;
-        float pre_filter_len_sym;
-        int pre_window;
-        int pre_filter_taps;
-        float pre_filter[1024];
-        float raw_cb[1024];
-        ...;  // This tells CFFI there are other fields we don't care about
-    };
-    
+    // We only need the type name for CFFI to accept it as a parameter,
+    // so we declare an opaque struct with NO FIELDS (or minimal placeholders).
+    typedef struct demodulator_state_s demodulator_state_s;
+
     void demod_afsk_init(int samples_per_sec, int baud,
-                        int mark_freq, int space_freq,
-                        char profile, 
-                        struct demodulator_state_s *D);
-                        
+                         int mark_freq, int space_freq,
+                         char profile, 
+                         demodulator_state_s *D);
+
     void demod_afsk_process_sample(int chan, int subchan,
-                                 int sam,
-                                 struct demodulator_state_s *D);
-                                 
+                                   int sam,
+                                   demodulator_state_s *D);
+
     void hdlc_rec_bit(int chan, int subchan, int slice,
-                     int raw, int is_scrambled, int not_used_remove);
+                      int raw, int is_scrambled, int not_used_remove);
 """)
+
 
 ffibuilder.set_source("_fsk_demod",
     """
