@@ -20,7 +20,7 @@ class ViperwolfFSKDecoder:
             baud_rate,
             mark_freq,
             space_freq,
-            ord('A'),  # or 'B'
+            b'A',
             self.demod_state
         )
 
