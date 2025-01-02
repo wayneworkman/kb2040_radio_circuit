@@ -41,7 +41,8 @@ ffibuilder.cdef("""
 
 
 
-ffibuilder.set_source("_fsk_demod",
+ffibuilder.set_source(
+    "_fsk_demod",
     """
     #include "direwolf.h"
     #include "demod_afsk.h"
@@ -49,7 +50,7 @@ ffibuilder.set_source("_fsk_demod",
     """,
     sources=[
         str(CURRENT_DIR / 'c' / 'demod_afsk.c'),
-        str(CURRENT_DIR / 'c' / 'hdlc_rec.c')
+        # str(CURRENT_DIR / 'c' / 'hdlc_rec.c'),     # KEEP THIS if it's the correct (only) version
     ],
     include_dirs=[str(CURRENT_DIR / 'c' / 'include')]
 )
