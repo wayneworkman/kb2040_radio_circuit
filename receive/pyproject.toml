@@ -6,9 +6,9 @@ build-backend = "setuptools.build_meta"
 name = "kb2040_radio_circuit"
 version = "0.1.0"
 description = "FSK modulation and demodulation for amateur radio using KB2040"
-readme = "../README.md"
+readme = "README.md"
 requires-python = ">=3.7"
-license = {file = "../LICENSE"}
+license = {file = "LICENSE"}
 authors = [
     {name = "Wayne Workman", email = "wayne@example.com"}
 ]
