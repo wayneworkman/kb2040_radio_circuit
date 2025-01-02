@@ -1,4 +1,4 @@
-// File: receive/src/direwolf/c/include/direwolf.h
+// File: receive/src/viperwolf/c/include/viperwolf.h
 
 #ifndef DIREWOLF_H
 #define DIREWOLF_H

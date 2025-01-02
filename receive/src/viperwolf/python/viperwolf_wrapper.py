@@ -1,7 +1,7 @@
 # File: receive/src/viperwolf/python/viperwolf_wrapper.py
 
+import os
 from cffi import FFI
-import numpy as np
 
 class ViperwolfFSKDecoder:
     def __init__(self, sample_rate=48000, baud_rate=300,
@@ -9,20 +9,21 @@ class ViperwolfFSKDecoder:
         self.ffi = FFI()
         self._init_ffi()
 
-        # Allocate our demod_state on the heap:
+        # Allocate demodulator state
         self.demod_state = self.ffi.new("struct demodulator_state_s *")
 
-        # Initialize the demod:
+        # Initialize the demod
         self.lib.demod_afsk_init(
             sample_rate,
             baud_rate,
             mark_freq,
             space_freq,
-            ord('A'),  # or 'B' if you prefer
+            ord('A'),  # or 'B'
             self.demod_state
         )
 
     def _init_ffi(self):
+        # Provide the function prototypes
         self.ffi.cdef("""
             typedef struct demodulator_state_s demodulator_state_s;
 
@@ -33,13 +34,17 @@ class ViperwolfFSKDecoder:
             int my_fsk_get_bits(int *out_bits, int max_bits);
             void my_fsk_clear_buffer(void);
         """)
-        # Load the compiled extension: _viperwolf_demod.so
-        self.lib = self.ffi.dlopen("_viperwolf_demod.so")
+
+        # Figure out the absolute path to _viperwolf_demod.so next to this file
+        current_dir = os.path.dirname(__file__)
+        so_path = os.path.join(current_dir, "_viperwolf_demod.so")
+
+        # Now open that .so
+        self.lib = self.ffi.dlopen(so_path)
 
     def process_samples(self, samples):
         """
-        Feed a numpy array of float32 samples, e.g. from a mic input,
-        scaled to [-1..+1].
+        Feed a list/array of float samples [-1..+1].
         """
         for sample in samples:
             scaled = int(sample * 32767)
@@ -47,8 +52,7 @@ class ViperwolfFSKDecoder:
 
     def get_raw_bits(self, max_bits=1024):
         """
-        Retrieve up to 'max_bits' bits from the ring buffer in C.
-        Return them as a Python list of 0/1.
+        Retrieve up to 'max_bits' bits from ring buffer in C.
         """
         out_array = self.ffi.new("int[]", max_bits)
         count = self.lib.my_fsk_get_bits(out_array, max_bits)
