@@ -15,31 +15,21 @@ with open(CURRENT_DIR / 'c' / 'include' / 'demod_afsk.h', 'r') as f:
 with open(CURRENT_DIR / 'c' / 'include' / 'hdlc_rec.h', 'r') as f:
     hdlc_header = f.read()
 
-# Then use cdef(...) with direwolf_header, demod_header, hdlc_header if needed.
-# or do everything inline as you have now.
-
 ffibuilder.cdef("""
-
-    // Forward-declare the struct using the same tag name
-    // that your C code uses in function params:
     struct demodulator_state_s;
-
-    // Now declare the functions exactly matching your .h file:
     void demod_afsk_init(int samples_per_sec, int baud,
                          int mark_freq, int space_freq,
                          char profile,
                          struct demodulator_state_s *D);
-
     void demod_afsk_process_sample(int chan, int subchan,
                                    int sam,
                                    struct demodulator_state_s *D);
 
-    void hdlc_rec_bit(int chan, int subchan, int slice,
-                      int raw, int is_scrambled, int not_used_remove);
-
+    // Our custom ring buffer functions:
+    void my_fsk_rec_bit(int bit);
+    int my_fsk_get_bits(int *out_bits, int max_bits);
+    void my_fsk_clear_buffer(void);
 """)
-
-
 
 ffibuilder.set_source(
     "_fsk_demod",
@@ -47,10 +37,12 @@ ffibuilder.set_source(
     #include "direwolf.h"
     #include "demod_afsk.h"
     #include "hdlc_rec.h"
+    #include "my_fsk.h"
     """,
     sources=[
         str(CURRENT_DIR / 'c' / 'demod_afsk.c'),
-        str(CURRENT_DIR / 'c' / 'hdlc_rec.c'),  # <--- add this line
+        str(CURRENT_DIR / 'c' / 'hdlc_rec.c'),   # might still be needed if you want to link it; or you can remove
+        str(CURRENT_DIR / 'c' / 'my_fsk.c'),     # <- new addition
     ],
     include_dirs=[str(CURRENT_DIR / 'c' / 'include')]
 )

@@ -4,60 +4,40 @@ import numpy as np
 import logging
 
 class DirewolfFSKDecoder:
-    """
-    A Python wrapper around direwolf's FSK demodulation capabilities.
-    Integrates with your existing AFSK demodulator.
-    """
     def __init__(self, sample_rate=48000, baud_rate=300,
                  mark_freq=1200, space_freq=2200):
-        # Initialize CFFI
         self.ffi = FFI()
         self._init_ffi()
-        
-        # Create demodulator state
         self.demod_state = self.ffi.new("struct demodulator_state_s *")
-        
-        # Initialize demodulator
         self.lib.demod_afsk_init(sample_rate, baud_rate, mark_freq,
-                                space_freq, ord('A'), self.demod_state)
-        
+                                 space_freq, ord('A'), self.demod_state)
+
     def _init_ffi(self):
-        """Initialize the FFI interface to C code."""
         self.ffi.cdef("""
             typedef struct demodulator_state_s demodulator_state_s;
 
-            void demod_afsk_init(int samples_per_sec, int baud,
-                                int mark_freq, int space_freq,
-                                char profile,
-                                demodulator_state_s *D);
+            void demod_afsk_init(int, int, int, int, char, demodulator_state_s*);
+            void demod_afsk_process_sample(int, int, int, demodulator_state_s*);
 
-            void demod_afsk_process_sample(int chan, int subchan,
-                                        int sam,
-                                        demodulator_state_s *D);
+            void my_fsk_rec_bit(int bit);
+            int my_fsk_get_bits(int *out_bits, int max_bits);
+            void my_fsk_clear_buffer(void);
         """)
-        
         self.lib = self.ffi.dlopen("_fsk_demod.so")
-        
-    def process_samples(self, samples):
-        """Process a chunk of audio samples."""
-        for sample in samples:
-            # Scale to 16-bit range expected by direwolf
-            scaled = int(sample * 32767)
-            self.lib.demod_afsk_process_sample(0, 0, scaled, 
-                                             self.demod_state)
 
-# Modified afsk_demod.py (excerpt showing integration)
-def demodulator_process(audio_q, message_q):
-    """
-    Modified demodulator process that can use either the original
-    Goertzel detector or the direwolf decoder.
-    """
-    # Initialize both decoders
-    direwolf_decoder = DirewolfFSKDecoder(
-        sample_rate=SAMPLE_RATE,
-        baud_rate=BAUD_RATE,
-        mark_freq=FREQ0,
-        space_freq=FREQ1
-    )
-    
-    # Rest of your existing demodulator code...
+    def process_samples(self, samples):
+        for sample in samples:
+            scaled = int(sample * 32767)
+            self.lib.demod_afsk_process_sample(0, 0, scaled, self.demod_state)
+
+    def get_raw_bits(self, max_bits=1024):
+        """
+        Retrieve up to 'max_bits' bits from the ring buffer in C.
+        Returns a Python list of 0/1 integers.
+        """
+        out_array = self.ffi.new("int[]", max_bits)
+        count = self.lib.my_fsk_get_bits(out_array, max_bits)
+        return [out_array[i] for i in range(count)]
+
+    def clear_ring_buffer(self):
+        self.lib.my_fsk_clear_buffer()
