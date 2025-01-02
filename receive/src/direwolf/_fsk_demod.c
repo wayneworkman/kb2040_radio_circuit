@@ -573,8 +573,7 @@ static void (*_cffi_call_python_org)(struct _cffi_externpy_s *, char *);
 
     #include "direwolf.h"
     #include "demod_afsk.h"
-    #include "hdlc_rec.h"
-    #include "my_fsk.h"
+    #include "my_fsk.h"  // For the ring buffer
     
 
 /************************************************************/
