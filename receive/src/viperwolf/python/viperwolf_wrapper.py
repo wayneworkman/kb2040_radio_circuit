@@ -9,7 +9,7 @@ class ViperwolfFSKDecoder:
         self.ffi = FFI()
         self._init_ffi()
 
-        # Allocate demodulator state
+        # Allocate our demodulator state
         self.demod_state = self.ffi.new("struct demodulator_state_s *")
 
         # Initialize the demod
@@ -23,7 +23,6 @@ class ViperwolfFSKDecoder:
         )
 
     def _init_ffi(self):
-        # Provide the function prototypes
         self.ffi.cdef("""
             typedef struct demodulator_state_s demodulator_state_s;
 
@@ -35,11 +34,9 @@ class ViperwolfFSKDecoder:
             void my_fsk_clear_buffer(void);
         """)
 
-        # Figure out the absolute path to _viperwolf_demod.so next to this file
+        # The .so is placed next to this file by build_viperwolf.py
         current_dir = os.path.dirname(__file__)
         so_path = os.path.join(current_dir, "_viperwolf_demod.so")
-
-        # Now open that .so
         self.lib = self.ffi.dlopen(so_path)
 
     def process_samples(self, samples):
