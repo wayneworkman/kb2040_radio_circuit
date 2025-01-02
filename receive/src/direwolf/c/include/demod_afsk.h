@@ -7,28 +7,26 @@
 #include <stdlib.h>
 #include <math.h>
 #include <string.h>
-#include <assert.h>
-#include <unistd.h>
 #include <ctype.h>
 
-#include "direwolf.h"         // For MAX_CHANS, etc.
-#include "fsk_demod_state.h"  // struct demodulator_state_s
-#include "textcolor.h"
+#include "direwolf.h"
+#include "fsk_demod_state.h"
 #include "dsp.h"
+#include "textcolor.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 // Initialize the AFSK demodulator:
-void demod_afsk_init(int samples_per_sec, 
+void demod_afsk_init(int samples_per_sec,
                      int baud,
                      int mark_freq,
                      int space_freq,
                      char profile,
                      struct demodulator_state_s *D);
 
-// Process a single audio sample through the demodulator:
+// Process a single audio sample:
 void demod_afsk_process_sample(int chan,
                                int subchan,
                                int sam,

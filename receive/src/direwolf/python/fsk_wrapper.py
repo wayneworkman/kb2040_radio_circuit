@@ -1,16 +1,26 @@
-# src/direwolf/python/fsk_wrapper.py
+# File: receive/src/direwolf/python/fsk_wrapper.py
+
 from cffi import FFI
 import numpy as np
-import logging
 
 class DirewolfFSKDecoder:
     def __init__(self, sample_rate=48000, baud_rate=300,
                  mark_freq=1200, space_freq=2200):
         self.ffi = FFI()
         self._init_ffi()
+
+        # Allocate our demod_state on the heap:
         self.demod_state = self.ffi.new("struct demodulator_state_s *")
-        self.lib.demod_afsk_init(sample_rate, baud_rate, mark_freq,
-                                 space_freq, ord('A'), self.demod_state)
+
+        # Initialize the demod:
+        self.lib.demod_afsk_init(
+            sample_rate,
+            baud_rate,
+            mark_freq,
+            space_freq,
+            ord('A'),    # or 'B' if you prefer
+            self.demod_state
+        )
 
     def _init_ffi(self):
         self.ffi.cdef("""
@@ -23,9 +33,14 @@ class DirewolfFSKDecoder:
             int my_fsk_get_bits(int *out_bits, int max_bits);
             void my_fsk_clear_buffer(void);
         """)
+        # Load the just-compiled shared object:
         self.lib = self.ffi.dlopen("_fsk_demod.so")
 
     def process_samples(self, samples):
+        """
+        Feed a numpy array of float32 samples, e.g. from a mic input,
+        scaled to [-1..+1], into the demod. We'll do single-slicer logic.
+        """
         for sample in samples:
             scaled = int(sample * 32767)
             self.lib.demod_afsk_process_sample(0, 0, scaled, self.demod_state)
@@ -33,7 +48,7 @@ class DirewolfFSKDecoder:
     def get_raw_bits(self, max_bits=1024):
         """
         Retrieve up to 'max_bits' bits from the ring buffer in C.
-        Returns a Python list of 0/1 integers.
+        Return them as a Python list of 0/1.
         """
         out_array = self.ffi.new("int[]", max_bits)
         count = self.lib.my_fsk_get_bits(out_array, max_bits)
