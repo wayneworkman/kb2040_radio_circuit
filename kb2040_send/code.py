@@ -1,9 +1,16 @@
-# code.py goes in the device's CIRCUITPY root directory on the Adafruit KB2040
-
 import time
 import board
 import pwmio
 import digitalio
+
+# ----------------------------
+# TIMING CONSTANTS
+# ----------------------------
+POWER_BEFORE_PTT = 5.0  # seconds to wait after power on before PTT
+POWER_AFTER_PTT = 5.0   # seconds to wait after PTT before power off
+CYCLE_TIME = 300.0      # 5 minutes in seconds
+PTT_KEYUP_DELAY = 0.5
+PTT_KEYDOWN_DELAY = 0.5
 
 # ----------------------------
 # FSK & BAUD RATE CONFIG
@@ -11,16 +18,6 @@ import digitalio
 BAUD_RATE = 300
 FREQ0 = 1200  # Mark frequency (Hz)
 FREQ1 = 2200  # Space frequency (Hz)
-interval = 300  # seconds between transmissions
-
-# ----------------------------
-# TIMING CONSTANTS
-# ----------------------------
-# How long to wait after keying the transmitter, before sending FSK
-PTT_KEYUP_DELAY = 0.5
-
-# How long to wait after the end sequence, before releasing PTT
-PTT_KEYDOWN_DELAY = 0.5
 
 # ----------------------------
 # STATION CONFIG
@@ -30,13 +27,17 @@ PREAMBLE = "101010101010"   # 12 alternating bits
 END_SEQUENCE = "11111111"   # 8 bits to signify end of transmission
 
 # ----------------------------
-# SETUP THE PWM & PTT
+# SETUP THE PWM, PTT & POWER
 # ----------------------------
 pwm = pwmio.PWMOut(board.A0, frequency=FREQ0, duty_cycle=32767)
 
 ptt = digitalio.DigitalInOut(board.D9)
 ptt.direction = digitalio.Direction.OUTPUT
 ptt.value = False  # Start with PTT off
+
+power = digitalio.DigitalInOut(board.D8)
+power.direction = digitalio.Direction.OUTPUT
+power.value = False  # Start with power off
 
 def set_tone(freq):
     """Re-initialize the PWM with the requested frequency."""
@@ -73,6 +74,11 @@ def send_string(message):
 def transmit_packet(payload):
     """Transmit a complete packet with preamble, payload, callsign, and end sequence."""
     print("Transmitting:", payload)
+    
+    # Turn on power and wait
+    power.value = True
+    print("Power on, waiting", POWER_BEFORE_PTT, "seconds")
+    time.sleep(POWER_BEFORE_PTT)
 
     # Key the transmitter
     ptt.value = True
@@ -86,19 +92,32 @@ def transmit_packet(payload):
     send_string(CALLSIGN)
     send_end_sequence()
 
-    # Wait some extra time after finishing the end sequence, 
+    # Wait some extra time after finishing the end sequence,
     # keeping PTT active but sending no further tones
     time.sleep(PTT_KEYDOWN_DELAY)
 
-    # Finally release PTT
+    # Release PTT
     ptt.value = False
-
-    # (Optional) small extra settle time after unkeying
-    time.sleep(0.1)
+    
+    # Wait after PTT before turning off power
+    print("PTT off, waiting", POWER_AFTER_PTT, "seconds before power off")
+    time.sleep(POWER_AFTER_PTT)
+    
+    # Turn off power
+    power.value = False
+    print("Power off")
 
 # ----------------------------
 # MAIN LOOP
 # ----------------------------
 while True:
+    print("\nStarting transmission cycle")
     transmit_packet("hello world")
-    time.sleep(interval)  # Wait N seconds between transmissions
+    
+    # Calculate remaining time in the cycle
+    # This ensures consistent 5-minute timing regardless of transmission duration
+    elapsed = POWER_BEFORE_PTT + PTT_KEYUP_DELAY + PTT_KEYDOWN_DELAY + POWER_AFTER_PTT
+    remaining = CYCLE_TIME - elapsed
+    if remaining > 0:
+        print("Waiting", remaining, "seconds until next cycle")
+        time.sleep(remaining)
