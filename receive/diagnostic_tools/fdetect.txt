@@ -1,0 +1,7 @@
+Compile:
+gcc -O2 -o fdetect fdetect.c -lm
+
+
+
+Run:
+arecord --device hw:1,0 --format S16_LE --channels 1 --rate 48000 | ./fdetect > output.txt

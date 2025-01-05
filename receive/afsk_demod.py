@@ -110,18 +110,23 @@ decoder = ViperwolfFSKDecoder(
 def bits_to_ascii(bit_string):
     """
     Convert a raw bit string (e.g. '10101000') into ASCII in groups of 8 bits.
-    Return the resulting string. 
+    Return the resulting string.
     """
+    # Extra logging to see exactly what bits are being converted
+    log_diagnostic(f"bits_to_ascii() called with bit_string={repr(bit_string)}")
     chars = []
     for i in range(0, len(bit_string), 8):
         chunk = bit_string[i : i+8]
         if len(chunk) < 8:
+            log_diagnostic(f"bits_to_ascii() ignoring leftover bits: {chunk}")
             break  # ignore leftover
         val = 0
         for bit in chunk:
             val = (val << 1) | (1 if bit == '1' else 0)
         chars.append(chr(val))
-    return "".join(chars)
+    ascii_str = "".join(chars)
+    log_diagnostic(f"bits_to_ascii() returning ASCII={repr(ascii_str)}")
+    return ascii_str
 
 # -----------------------------
 # BIT-PROCESSING 
@@ -135,30 +140,32 @@ def handle_raw_bits(bit_list):
     global accum_bits
     global preamble_detected_time
 
+    if not bit_list:
+        log_diagnostic("handle_raw_bits() called with an empty bit_list.")
+    else:
+        log_diagnostic(f"handle_raw_bits() got {len(bit_list)} new bits: {bit_list}")
+
     # 1) If we're currently ignoring bits (no preamble yet),
     #    see if the new chunk has a preamble.
     # 2) If we are collecting bits, see if we find a new preamble or an end sequence.
 
-    # Convert the new bits to a string for searching
     new_str = "".join(str(b) for b in bit_list)
+    log_diagnostic(f"Converted new bits to string: {new_str}")
 
-    # We might also want to merge them into a big string for searching across boundaries
     if in_message:
         # We are currently accumulating
         accum_bits.extend(bit_list)
-        # Then form a single string from accum_bits
         merged_str = "".join(str(b) for b in accum_bits)
+        log_diagnostic(f"In-message mode. Merged bit string so far: {merged_str}")
 
         # see if there's an end sequence
         idx_end = merged_str.find(END_SEQ_BITS)
         if idx_end != -1:
-            # yes, we found an end
-            # everything before idx_end is the message (excluding the end sequence)
+            log_diagnostic(f"END_SEQ_BITS found at index={idx_end}")
             message_part = merged_str[:idx_end]
             ascii_text = bits_to_ascii(message_part)
             log_data_message(f"Complete message: {repr(ascii_text)}")
 
-            # done with this message
             in_message = False
             accum_bits = []
             return
@@ -167,19 +174,19 @@ def handle_raw_bits(bit_list):
         idx_preamble_2 = merged_str.find(PREAMBLE_BITS)
         if idx_preamble_2 != -1:
             # We found a second preamble while still in the old message
-            log_diagnostic("2nd preamble detected - restarting the partial message/timer.")
+            log_diagnostic(f"Second preamble found at index={idx_preamble_2}, discarding old partial message.")
             in_message = True
             preamble_detected_time = time.time()
-            # discard bits up to & including that 2nd preamble
             keep_index = idx_preamble_2 + len(PREAMBLE_BITS)
             leftover_str = merged_str[keep_index:]
             accum_bits = list(map(int, leftover_str))
+            log_diagnostic(f"accum_bits replaced with leftover after second preamble: {accum_bits}")
             return
 
         # else check for timeout
         elapsed = time.time() - preamble_detected_time
         if elapsed > WAIT_FOR_END_SEC:
-            log_diagnostic("No end-sequence found in time; discarding partial bits.")
+            log_diagnostic(f"No end-sequence found after {elapsed:.2f} sec; discarding partial bits.")
             in_message = False
             accum_bits = []
             return
@@ -188,17 +195,16 @@ def handle_raw_bits(bit_list):
         # we are ignoring bits => check if the new bits contain a preamble
         idx_preamble = new_str.find(PREAMBLE_BITS)
         if idx_preamble != -1:
-            # found a preamble
-            log_diagnostic("Preamble detected! Starting a new message.")
+            log_diagnostic(f"Preamble detected at index={idx_preamble}.")
             in_message = True
             preamble_detected_time = time.time()
 
-            # discard everything up to & including that preamble from the new chunk
             keep_index = idx_preamble + len(PREAMBLE_BITS)
             leftover_str = new_str[keep_index:]
             accum_bits = list(map(int, leftover_str))
-        # else do nothing, keep ignoring bits
-
+            log_diagnostic(f"Started new message. accum_bits={accum_bits}")
+        else:
+            log_diagnostic("No preamble found; still ignoring bits.")
 
 # -----------------------------
 # THREAD FUNCTIONS
@@ -225,16 +231,19 @@ def audio_capture_loop():
                 if overflowed:
                     log_diagnostic("Sounddevice reported an overflow.")
 
-                # Flatten the single channel and apply gain
                 audio_data = audio_chunk[:, 0].copy() * AUDIO_GAIN
+                # Extra diag: log the first few samples
+                log_diagnostic(f"Captured {len(audio_data)} samples. First 5 samples: {audio_data[:5].tolist()}")
 
-                # Feed samples to the decoder
                 decoder.process_samples(audio_data)
 
-                # Then retrieve any raw bits
+                # retrieve any new bits
                 raw_bits = decoder.get_raw_bits(4096)
                 if raw_bits:
+                    log_diagnostic(f"decoder.get_raw_bits() returned {len(raw_bits)} bits.")
                     handle_raw_bits(raw_bits)
+                else:
+                    log_diagnostic("decoder.get_raw_bits() returned 0 bits this chunk.")
 
                 time.sleep(0.01)
 
@@ -243,7 +252,6 @@ def audio_capture_loop():
 
     log_diagnostic("Audio capture loop exiting.")
 
-
 def watch_for_enter_key():
     """
     This function blocks until user presses ENTER, then sets SHOULD_EXIT=True.
@@ -251,7 +259,6 @@ def watch_for_enter_key():
     global SHOULD_EXIT
     input("\nPress ENTER at any time to stop...\n")
     SHOULD_EXIT = True
-
 
 def main():
     log_diagnostic("Starting AFSK demod script.")
@@ -267,6 +274,6 @@ def main():
 
     log_diagnostic("Exiting afsk_demod.py script.")
 
-
 if __name__ == "__main__":
     main()
+
