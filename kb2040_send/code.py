@@ -1,3 +1,5 @@
+# code.py - Place this file in the root directory of your CircuitPython device
+
 import time
 import board
 import pwmio
@@ -8,16 +10,16 @@ import digitalio
 # ----------------------------
 # KB2040 pin assignments
 FSK_OUTPUT_PIN = board.A0    # FSK tone output pin (PWM capable)
-PTT_PIN = board.D9          # Push-to-Talk control pin
-POWER_PIN = board.D8        # Power control pin
+PTT_PIN = board.D9           # Push-to-Talk control pin
+POWER_PIN = board.D8         # Power control pin
 
 # ----------------------------
 # TIMING CONSTANTS
 # ----------------------------
-POWER_BEFORE_PTT = 4.0  # seconds to wait after power on before PTT
-POWER_AFTER_PTT = 1.0   # seconds to wait after PTT before power off
-CYCLE_TIME = 20.0      # 5 minutes in seconds
-PTT_KEYUP_DELAY = 0.5
+POWER_BEFORE_PTT = 4.0       # Seconds to wait after power on before PTT
+POWER_AFTER_PTT = 1.0        # Seconds to wait after PTT before power off
+CYCLE_TIME = 12.0            # Time between transmissions
+PTT_KEYUP_DELAY = 1.0
 PTT_KEYDOWN_DELAY = 0.5
 
 # ----------------------------
@@ -35,10 +37,8 @@ PREAMBLE = "101010101010"   # 12 alternating bits
 END_SEQUENCE = "11111111"   # 8 bits to signify end of transmission
 
 # ----------------------------
-# SETUP THE PWM, PTT & POWER
+# SETUP THE PTT & POWER
 # ----------------------------
-pwm = pwmio.PWMOut(FSK_OUTPUT_PIN, frequency=FREQ0, duty_cycle=32767)
-
 ptt = digitalio.DigitalInOut(PTT_PIN)
 ptt.direction = digitalio.Direction.OUTPUT
 ptt.value = False  # Start with PTT off
@@ -47,14 +47,28 @@ power = digitalio.DigitalInOut(POWER_PIN)
 power.direction = digitalio.Direction.OUTPUT
 power.value = False  # Start with power off
 
+# We'll create a global reference to PWM but not initialize it right away.
+pwm = None
+
 def set_tone(freq):
-    """Re-initialize the PWM with the requested frequency."""
+    """
+    Initialize or re-initialize the PWM with the requested frequency.
+    This function also enables PWM output when called.
+    """
     global pwm
-    pwm.deinit()
+
+    # Disable any existing PWM output first
+    if pwm is not None:
+        pwm.deinit()
+
+    # Now enable PWM output at the given frequency
     pwm = pwmio.PWMOut(FSK_OUTPUT_PIN, frequency=freq, duty_cycle=32767)
 
 def send_bit(bit):
-    """Send a single bit using FSK."""
+    """
+    Send a single bit using FSK.
+    Mark (1) = FREQ1, Space (0) = FREQ0
+    """
     set_tone(FREQ1 if bit else FREQ0)
     time.sleep(1.0 / BAUD_RATE)
 
@@ -80,7 +94,12 @@ def send_string(message):
         send_byte(char)
 
 def transmit_packet(payload):
-    """Transmit a complete packet with preamble, payload, callsign, and end sequence."""
+    """
+    Transmit a complete packet with preamble, payload, callsign,
+    and end sequence. PWM output is enabled only while sending bits.
+    """
+    global pwm
+
     print("Transmitting:", payload)
     
     # Turn on power and wait
@@ -94,14 +113,19 @@ def transmit_packet(payload):
     # Wait some time before actually transmitting any FSK tones
     time.sleep(PTT_KEYUP_DELAY)
 
-    # Send the packet
+    # -- BEGIN FSK TRANSMISSION --
     send_preamble()
     send_string(payload)
     send_string(CALLSIGN)
     send_end_sequence()
+    # -- END FSK TRANSMISSION --
 
-    # Wait some extra time after finishing the end sequence,
-    # keeping PTT active but sending no further tones
+    # Disable PWM output after sending the end sequence
+    if pwm is not None:
+        pwm.deinit()
+        pwm = None
+
+    # Wait some extra time keeping PTT active but sending no further tones
     time.sleep(PTT_KEYDOWN_DELAY)
 
     # Release PTT
@@ -123,7 +147,6 @@ while True:
     transmit_packet("hello world")
     
     # Calculate remaining time in the cycle
-    # This ensures consistent 5-minute timing regardless of transmission duration
     elapsed = POWER_BEFORE_PTT + PTT_KEYUP_DELAY + PTT_KEYDOWN_DELAY + POWER_AFTER_PTT
     remaining = CYCLE_TIME - elapsed
     if remaining > 0:
