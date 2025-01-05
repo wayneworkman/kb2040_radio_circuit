@@ -4,11 +4,19 @@ import pwmio
 import digitalio
 
 # ----------------------------
+# PIN CONFIGURATION
+# ----------------------------
+# KB2040 pin assignments
+FSK_OUTPUT_PIN = board.A0    # FSK tone output pin (PWM capable)
+PTT_PIN = board.D9          # Push-to-Talk control pin
+POWER_PIN = board.D8        # Power control pin
+
+# ----------------------------
 # TIMING CONSTANTS
 # ----------------------------
-POWER_BEFORE_PTT = 5.0  # seconds to wait after power on before PTT
-POWER_AFTER_PTT = 5.0   # seconds to wait after PTT before power off
-CYCLE_TIME = 300.0      # 5 minutes in seconds
+POWER_BEFORE_PTT = 4.0  # seconds to wait after power on before PTT
+POWER_AFTER_PTT = 1.0   # seconds to wait after PTT before power off
+CYCLE_TIME = 20.0      # 5 minutes in seconds
 PTT_KEYUP_DELAY = 0.5
 PTT_KEYDOWN_DELAY = 0.5
 
@@ -29,13 +37,13 @@ END_SEQUENCE = "11111111"   # 8 bits to signify end of transmission
 # ----------------------------
 # SETUP THE PWM, PTT & POWER
 # ----------------------------
-pwm = pwmio.PWMOut(board.A0, frequency=FREQ0, duty_cycle=32767)
+pwm = pwmio.PWMOut(FSK_OUTPUT_PIN, frequency=FREQ0, duty_cycle=32767)
 
-ptt = digitalio.DigitalInOut(board.D9)
+ptt = digitalio.DigitalInOut(PTT_PIN)
 ptt.direction = digitalio.Direction.OUTPUT
 ptt.value = False  # Start with PTT off
 
-power = digitalio.DigitalInOut(board.D8)
+power = digitalio.DigitalInOut(POWER_PIN)
 power.direction = digitalio.Direction.OUTPUT
 power.value = False  # Start with power off
 
@@ -43,7 +51,7 @@ def set_tone(freq):
     """Re-initialize the PWM with the requested frequency."""
     global pwm
     pwm.deinit()
-    pwm = pwmio.PWMOut(board.A0, frequency=freq, duty_cycle=32767)
+    pwm = pwmio.PWMOut(FSK_OUTPUT_PIN, frequency=freq, duty_cycle=32767)
 
 def send_bit(bit):
     """Send a single bit using FSK."""

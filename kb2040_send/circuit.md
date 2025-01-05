@@ -1,6 +1,4 @@
-Below are updated step-by-step textual instructions, consistent with the style you previously provided. They include the new 470k resistor and 1nF capacitor for RFI mitigation on the transistor’s base. 
 
----
 
 ## PTT CIRCUIT
 1. From KB2040 pin D9 connect to one end of a 4.7kΩ resistor  
